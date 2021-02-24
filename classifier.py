@@ -1,5 +1,7 @@
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import normalize, MinMaxScaler
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.metrics import roc_curve, auc, plot_roc_curve
+from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression, Lasso
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
@@ -8,6 +10,7 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, Gradien
 from sklearn.neural_network import MLPClassifier
 from sklearn.naive_bayes import GaussianNB
 from plotnine import ggplot, aes, geom_bar, coord_flip
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import os
@@ -19,16 +22,17 @@ def classifiers(X, y):
     @param X: features
     @param y: class
     """
-    (
-        X_train, X_test, 
-        y_train, y_test
-    ) = train_test_split(
-            X, y,
-            test_size = 0.25,
-            random_state = 0
-        )
+    # (
+    #     X_train, X_test, 
+    #     y_train, y_test
+    # ) = train_test_split(
+    #         X, y,
+    #         test_size = 0.25,
+    #         random_state = 0
+    #     )
 
     classifiers = [
+        DummyClassifier(strategy="uniform", random_state=0),
         LogisticRegression(),
         KNeighborsClassifier(),
         SVC(kernel='rbf', C=0.025),
@@ -37,43 +41,100 @@ def classifiers(X, y):
         MLPClassifier(alpha=1, max_iter=1000),
         AdaBoostClassifier(),
         GradientBoostingClassifier(),
-        Lasso(),
-        GaussianNB()
+        GaussianNB(),
+        # Lasso()
     ]
 
-    labels = np.array(y.values.tolist())
+    X = np.array(X.values.tolist())
+    y = np.array(y.values.tolist())
     auc_df = pd.DataFrame(columns=['classifier', 'auc'])
 
     for clf in classifiers:
+        skf = StratifiedKFold(n_splits=5)
         name = clf.__class__.__name__
+        auc_list = []
+        #---
+        tprs = []
+        aucs = []
+        mean_fpr = np.linspace(0, 1, 100)
 
-        clf.fit(X_train, y_train)
-        predictions = clf.predict(X)
-        fp, tp, _ = roc_curve(labels, predictions)
-        roc_auc = auc(fp, tp)
+        fig, ax = plt.subplots()
+        #---
+        if name == "LogisticRegression":
+            scaler = MinMaxScaler()
+            scaler.fit(X)
+            X1 = scaler.transform(X)
+        else:
+            X1 = X
+        
+        i = 1
+        for train_index, test_index in skf.split(X1, y):
+            X_train, X_test = X1[train_index], X1[test_index]
+            y_train, y_test = y[train_index], y[test_index]
 
+            clf.fit(X_train, y_train)
+            # if name == "LogisticRegression":
+            #     print(clf.coef_)
+            #     print(clf.intercept_)
+            predictions = clf.predict(X_test)
+            fp, tp, _ = roc_curve(y_test, predictions)
+            auc_list.append(auc(fp, tp))
+            #---
+            viz = plot_roc_curve(
+                clf, X_test, y_test,
+                name=f'ROC fold {i}',
+                alpha=0.3, lw=1, ax=ax
+            )
+            interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
+            interp_tpr[0] = 0.0
+            tprs.append(interp_tpr)
+            aucs.append(viz.roc_auc)
+            i = i+1
+        
+
+        ax.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', alpha=.8)
+
+        mean_tpr = np.mean(tprs, axis=0)
+        mean_tpr[-1] = 1.0
+        mean_auc = auc(mean_fpr, mean_tpr)
+        std_auc = np.std(aucs)
+        ax.plot(mean_fpr, mean_tpr, color='b',
+                label=r'Mean ROC (AUC = %0.2f $\pm$ %0.2f)' % (mean_auc, std_auc),
+                lw=2, alpha=.8)
+
+        std_tpr = np.std(tprs, axis=0)
+        tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+        tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+        ax.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2,
+                        label=r'$\pm$ 1 std. dev.')
+
+        ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, 1.05],
+            title=f"{name} ROC with CV")
+        ax.legend(loc="lower right")
+        plt.savefig(f"figures/{name}_roc.jpg")
+        #---
         auc_df = auc_df.append(
             {
                 'classifier': name,
-                'auc': roc_auc
+                'auc': sum(auc_list) / len(auc_list)
             }, 
             ignore_index=True
         )
+    print(auc_df)
     
     return auc_df
 
 
-def plot_aucs(df):
+def plot_auc(df):
     """
     Plots each classifier's AUC results.
-
     """
     plot = (
         ggplot(df)
         + geom_bar(aes(x='classifier', y='auc'), stat="identity")
         + coord_flip()
     )
-    plot.save(filename='aucs.png')
+    plot.save(filename='figures/auc.png')
 
 
 if __name__ == "__main__":
@@ -86,4 +147,4 @@ if __name__ == "__main__":
     y = df['Y']
 
     auc_df = classifiers(X, y)
-    plot_aucs(auc_df)
+    plot_auc(auc_df)
