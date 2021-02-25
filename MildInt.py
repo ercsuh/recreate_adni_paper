@@ -5,7 +5,7 @@ from tensorflow.keras.layers import GRU, Dense, Input, concatenate
 from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.metrics import AUC
 from sklearn.metrics import auc, roc_curve
-from matplotlib import pyplot
+# from matplotlib import pyplot
 import pandas as pd
 import numpy as np
 import os
@@ -64,17 +64,23 @@ class MildInt(object):
 
     
     def run_integrated_model(self, demo_X, demo_y, cog_X, cog_y, csf_X, csf_y, mri_X, mri_y):
-        # input = Input(shape=(3, ))
-        cog_z = GRU(4, activation='tanh')(cog_X)
-        csf_z = GRU(4, activation='tanh')(csf_X)
-        mri_z = GRU(4, activation='tanh')(mri_X)
+        # # keras example
+        # inputs = tf.keras.Input(shape=(3,))
+        # x = tf.keras.layers.Dense(4, activation=tf.nn.relu)(inputs)
+        # outputs = tf.keras.layers.Dense(5, activation=tf.nn.softmax)(x)
+        # model = tf.keras.Model(inputs=inputs, outputs=outputs)
+
+        inputs = tf.keras.Input(shape=(3,))
+        cog_z = GRU(3, return_sequences=False, input_shape=(cog_X.shape[1], cog_X.shape[2]))(cog_X)
+        csf_z = GRU(5, return_sequences=False, input_shape=(csf_X.shape[1], csf_X.shape[2]))(csf_X)
+        mri_z = GRU(4, return_sequences=False, input_shape=(mri_X.shape[1], mri_X.shape[2]))(mri_X)
         demo_z = Dense(2, activation='relu')(demo_X)
 
         z = concatenate(cog_z, csf_z, mri_z, demo_z)
         output = Dense(1, activation='sigmoid')(z)
 
         model = Model(
-            input=[cog_X, csf_X, mri_X, demo_X], 
+            input=[], 
             output=[cog_z, csf_z, mri_z, demo_z]
         )
 
@@ -82,6 +88,9 @@ class MildInt(object):
             optimizer='adam',
             loss='binary_crossentropy'
         )
+
+        # model.fit(X_train, y_train,epochs=20, batch_size=1, verbose=1)
+        # y_pred = model.predict(X_test)
 
         
 

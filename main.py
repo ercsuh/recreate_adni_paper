@@ -1,3 +1,6 @@
+"""
+Main script.
+"""
 from DataManager import *
 from MildInt import *
 import os
