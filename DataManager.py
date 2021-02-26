@@ -128,6 +128,7 @@ class DataManager(object):
                 if i < len(RID_df):
                     curr = np.array(RID_df.iloc[i,:][modal_cols[1:]].tolist())
                     curr[np.isnan(curr)] = 0
+                    # try prefixing with zeros instead of after keras - s
                 else: 
                     curr = [.0 for j in range(len(modal_cols)-1)]
                 RID_data.append(curr)

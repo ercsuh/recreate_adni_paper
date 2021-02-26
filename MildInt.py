@@ -77,7 +77,7 @@ class MildInt(object):
         # latent tensors
         cog_z = GRU(2, return_sequences=False, activation='linear')(cog_input)
         csf_z = GRU(5, return_sequences=False, activation='linear')(csf_input)
-        mri_z = GRU(3, return_sequences=False, activation='linear')(mri_input)
+        mri_z = GRU(3, return_sequences=False, activation='linear')(mri_input) # dense layer, mri is not longitudinal
         demo_z = Dense(2, activation='relu')(demo_input)
 
         # concatentate latent tensors
@@ -101,7 +101,7 @@ class MildInt(object):
         model.summary()
 
         print("[INFO] training model...")
-        model.fit(train_X, train_y, epochs=5, batch_size=1, verbose=1)
+        model.fit(train_X, train_y, epochs=5, batch_size=16, verbose=1) # try batch size 32, 64, 128
 
         print("[INFO] predicting MCI to AD conversion...")
         pred_y = model.predict(test_X)
@@ -110,7 +110,7 @@ class MildInt(object):
     
     def evaluate_model(self, y_predictions, y_test):
         eval_metrics = {}
-        y_pred = y_predictions.ravel().round()
+        y_pred = y_predictions.ravel().round()  # see garam's stack overflow link
         fpr, tpr, thresholds = roc_curve(y_test, y_pred)
         eval_metrics['FPR'] = fpr
         eval_metrics['TPR'] = tpr
