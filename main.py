@@ -1,24 +1,19 @@
 """
 Main script.
 """
-from DataManager import *
 from MildInt import *
+import matplotlib.pyplot as plt
 import os
 
 
-df = pd.read_csv(os.path.join(os.getcwd(), "data", "total_data.tsv"), sep="\t")
+model = MildInt(['cog', 'csf', 'mri', 'demo'])
 
-df.PTGENDER = pd.Categorical(df.PTGENDER)
-df.PTGENDER = df.PTGENDER.cat.codes
-demo_X = np.array(df[['PTGENDER', 'PTEDUCAT', 'AGE']].values.tolist())
-demo_y = np.array(df['Y'].values.tolist())
+for modal in model.X.keys():
+    print(f"{modal}: {model.X[modal].shape}")
 
-dm = DataManager()
-cog_X, cog_y = dm.get_modal_data('cog')
-csf_X, csf_y = dm.get_modal_data('csf')
-mri_X, mri_y = dm.get_modal_data('mri')
+print(f"y: {model.y.shape}")
 
-model = MildInt()
+
 # csf_auc = model.run_single_model(csf_X, csf_y)
 # mri_auc = model.run_single_model(mri_X, mri_y)
 # cog_auc = model.run_single_model(cog_X, cog_y)
@@ -28,4 +23,24 @@ model = MildInt()
 # print(f"CSF: {csf_auc}")
 # print(f"MRI: {mri_auc}")
 
-model.run_integrated_model(demo_X, demo_y, cog_X, cog_y, csf_X, csf_y, mri_X, mri_y)
+pred_y, test_y = model.run_integrated_model()
+metrics = model.evaluate_model(pred_y, test_y)
+print("[INFO] printing results...")
+print(f"AUC: {metrics['AUC']}")
+print(f"ACC: {metrics['ACC']}")
+print(f"SEN: {metrics['SEN']}")
+print(f"SPE: {metrics['SPE']}")
+
+
+plt.figure()
+lw = 2
+plt.plot(metrics['FPR'], metrics['TPR'], color='darkorange',
+         lw=lw, label='ROC curve (area = %0.2f)' % metrics['AUC'])
+plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Integrated model - Receiver operating characteristic')
+plt.legend(loc="lower right")
+plt.savefig("figures/integrated_model_roc.jpg")
