@@ -31,46 +31,54 @@ class MildInt(object):
             self.X[modal] = X
 
 
-    def split_data(self):
+    def split_data(self, X):
         """
         Train/test split.
         """
-        train_X_data = []
-        test_X_data = []
-        # for modal in self.X.keys():
-        #     X_train, X_test = train_test_split(self.X[modal], test_size=0.3, random_state=0)
-        #     train_X_data.append(X_train)
-        #     test_X_data.append(X_test)
+        X_train_data = []
+        X_test_data = []
+        for modal in X.keys():
+            X_train, X_test = train_test_split(X[modal], test_size=0.3, random_state=0)
+            X_train_data.append(X_train)
+            X_test_data.append(X_test)
+            # print(f"{modal} X_train: {X_train.shape}")
+            # print(f"{modal} X_test: {X_test.shape}")
 
-        split_fraction = 0.7
-
-        for modal in self.X.keys():
-            X = self.X[modal]
-            train_split = int(split_fraction * int(len(X)))
-            train_X, test_X = X[:train_split, :], X[train_split:, :]
-            train_X_data.append(train_X)
-            test_X_data.append(test_X)
-            # print(f"train_X: {train_X.shape}")
-            # print(f"test_X: {test_X.shape}")
-
-
-        train_split = int(split_fraction * int(len(self.y)))
         y_train, y_test = train_test_split(self.y, test_size=0.3, random_state=0)
         # print(f"train_y: {y_train.shape}")
         # print(f"test_y: {y_test.shape}")
-        return train_X_data, test_X_data, y_train, y_test
+        return X_train_data, X_test_data, y_train, y_test
 
     
-    def normalize_data(self):
+    def normalize_data(self, X, norm_option):
+        if norm_option == "all":
+            for modal in X.keys():
+                scaler = MinMaxScaler()
+                X[modal] = scaler.fit_transform(X[modal].reshape(-1, X[modal].shape[-1])).reshape(X[modal].shape)
+            return X
+        elif norm_option == "training_only":
+            train_X_data = []
+            for modal_data in X:
+                scalers = {}
+                for i in range(modal_data.shape[1]):
+                    scalers[i] = MinMaxScaler()
+                    modal_data[:, i, :] = scalers[i].fit_transform(modal_data[:, i, :]) 
+                train_X_data.append(modal_data)
+            return train_X_data
 
 
-    
-    def run_integrated_model(self):
+    def run_integrated_model(self, norm_option):
         """
         Builds and runs a Keras functional API model that takes in multi-modal data. 
         """
         print("[INFO] processing data...")
-        train_X, test_X, train_y, test_y = self.split_data()
+        if norm_option == "all":     
+            normalized_data = self.normalize_data(self.X, norm_option)
+            train_X, test_X, train_y, test_y = self.split_data(normalized_data)
+        elif norm_option == "training_only":
+            train_X, test_X, train_y, test_y = self.split_data(self.X)
+            train_X = self.normalize_data(train_X, norm_option)
+
 
         print("[INFO] creating model...")
         # input tensors
@@ -113,16 +121,38 @@ class MildInt(object):
         return pred_y, test_y
 
     
+    def Find_Optimal_Cutoff(self, fpr, tpr, threshold):
+        """ Find the optimal probability cutoff point for a classification model related to event rate
+    Parameters
+    ----------
+    target : Matrix with dependent or target data, where rows are observations
+
+    predicted : Matrix with predicted data, where rows are observations
+
+    Returns
+    -------     
+    list type, with optimal cutoff value
+        
+    """
+        i = np.arange(len(tpr)) 
+        roc = pd.DataFrame({'tf' : pd.Series(tpr-(1-fpr), index=i), 'threshold' : pd.Series(threshold, index=i)})
+        roc_t = roc.iloc[(roc.tf-0).abs().argsort()[:1]]
+
+        return list(roc_t['threshold']) 
+
+    
     def evaluate_model(self, y_predictions, y_test):
         eval_metrics = {}
-        y_pred = y_predictions.ravel().round()  # see garam's stack overflow link
+        y_pred = y_predictions.ravel()  # see garam's stack overflow link
         fpr, tpr, thresholds = roc_curve(y_test, y_pred)
+        eval_metrics['threshold'] = self.Find_Optimal_Cutoff(fpr, tpr, thresholds)
         eval_metrics['FPR'] = fpr
         eval_metrics['TPR'] = tpr
         eval_metrics['AUC'] = auc(fpr, tpr)
-        eval_metrics['ACC'] = accuracy_score(y_test, y_pred)
-        eval_metrics['SEN'] = recall_score(y_test, y_pred)
-        eval_metrics['SPE'] = precision_score(y_test, y_pred)
+        preds = np.where(y_pred > eval_metrics['threshold'], 1, 0)
+        eval_metrics['ACC'] = accuracy_score(y_test, preds)
+        eval_metrics['SEN'] = recall_score(y_test, preds)
+        eval_metrics['SPE'] = precision_score(y_test, preds)
         return eval_metrics
 
 

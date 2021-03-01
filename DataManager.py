@@ -17,21 +17,11 @@ class DataManager(object):
             os.path.join(os.getcwd(), 'data', 'adni_all_garam.csv'),
             sep=','
         )
-
         # only interested in RIDs with EMCI or LMCI status
         index_names = self.df[~(self.df['DX.at.baseline'].isin(['EMCI', 'LMCI']))].index
         self.df.drop(index_names, inplace=True)
-
         # unique RIDs
         self.RIDs = self.df['RID'].unique()
-
-        # clinical data containing only unique RIDs
-        self.clin_df = pd.read_csv(
-            os.path.join(os.getcwd(), "data", "ADNI_All_Clinical_Data_BL.csv"), 
-            sep=","
-        )
-        clin_index_names = self.clin_df[~(self.clin_df['RID'].isin(self.RIDs))].index
-        self.clin_df.drop(clin_index_names, inplace=True)
 
     
     def get_labels(self):
@@ -119,7 +109,7 @@ class DataManager(object):
                     truncating='post', 
                     value=0.0
                 )
-                RID_data = RID_data.transpose())
+                RID_data = RID_data.transpose()
             else:
                 RID_data = np.array(RID_df.iloc[0,:][modal_cols[1:]].tolist())
             

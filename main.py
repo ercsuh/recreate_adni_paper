@@ -12,10 +12,10 @@ import os
 
 model = MildInt(['cog', 'csf', 'mri', 'demo'])
 
-for modal in model.X.keys():
-    print(f"{modal}: {model.X[modal].shape}")
+# for modal in model.X.keys():
+#     print(f"{modal}: {model.X[modal].shape}")
 
-print(f"y: {model.y.shape}")
+# print(f"y: {model.y.shape}")
 
 
 # csf_auc = model.run_single_model(csf_X, csf_y)
@@ -27,13 +27,21 @@ print(f"y: {model.y.shape}")
 # print(f"CSF: {csf_auc}")
 # print(f"MRI: {mri_auc}")
 
-# pred_y, test_y = model.run_integrated_model()
-# metrics = model.evaluate_model(pred_y, test_y)
-# print("[INFO] printing results...")
-# print(f"AUC: {metrics['AUC']}")
-# print(f"ACC: {metrics['ACC']}")
-# print(f"SEN: {metrics['SEN']}")
-# print(f"SPE: {metrics['SPE']}")
+pred_y, test_y = model.run_integrated_model("all")
+metrics = model.evaluate_model(pred_y, test_y)
+print("[INFO] printing results (normalizing all values)...")
+for metric in metrics.keys():
+    if metric != 'FPR' and metric != 'TPR':
+        print(f"{metric}: {metrics[metric]}")
+
+
+# model = MildInt(['cog', 'csf', 'mri', 'demo'])
+# pred_y1, test_y1 = model.run_integrated_model("training_only")
+# metrics1 = model.evaluate_model(pred_y1, test_y1)
+# print("[INFO] printing results (normalizing training values only)...")
+# for metric in metrics1.keys():
+#     if metric != 'FPR' and metric != 'TPR':
+#         print(f"{metric}: {metrics1[metric]}")
 
 
 # plt.figure()
