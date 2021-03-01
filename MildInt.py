@@ -4,8 +4,9 @@ from tensorflow.compat.v1 import keras
 from tensorflow.keras.layers import GRU, Dense, Input
 from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.metrics import AUC
+from sklearn.preprocessing import normalize, MinMaxScaler
 from sklearn.model_selection import StratifiedKFold, train_test_split
-from sklearn.metrics import auc, roc_curve, accuracy_score, confusion_matrix, precision_score, recall_score
+from sklearn.metrics import auc, roc_curve, accuracy_score, precision_score, recall_score
 from matplotlib import pyplot
 import pandas as pd
 import numpy as np
@@ -60,6 +61,10 @@ class MildInt(object):
         return train_X_data, test_X_data, y_train, y_test
 
     
+    def normalize_data(self):
+
+
+    
     def run_integrated_model(self):
         """
         Builds and runs a Keras functional API model that takes in multi-modal data. 
@@ -71,13 +76,13 @@ class MildInt(object):
         # input tensors
         cog_input = Input(shape=(self.X['cog'].shape[1], self.X['cog'].shape[2]))
         csf_input = Input(shape=(self.X['csf'].shape[1], self.X['csf'].shape[2]))
-        mri_input = Input(shape=(self.X['mri'].shape[1], self.X['mri'].shape[2]))
+        mri_input = Input(shape=(self.X['mri'].shape[1]))
         demo_input = Input(shape=(self.X['demo'].shape[1]))
 
         # latent tensors
         cog_z = GRU(2, return_sequences=False, activation='linear')(cog_input)
         csf_z = GRU(5, return_sequences=False, activation='linear')(csf_input)
-        mri_z = GRU(3, return_sequences=False, activation='linear')(mri_input) # dense layer, mri is not longitudinal
+        mri_z = Dense(3, activation='relu')(mri_input) # dense layer, mri is not longitudinal
         demo_z = Dense(2, activation='relu')(demo_input)
 
         # concatentate latent tensors

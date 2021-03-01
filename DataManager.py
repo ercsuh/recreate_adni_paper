@@ -8,6 +8,7 @@ Modal options:
 import pandas as pd
 import numpy as np
 import os
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
 class DataManager(object):
@@ -74,42 +75,27 @@ class DataManager(object):
         return np.array(cp_df['Y'].values.tolist())
 
 
-    def get_modal_data(self, modal):
+    def get_modal_data(self, modal_type):
         """
         Specifies columns from ADNI data that are associated with the modal type. 
         @param modal (string): 'cog', 'csf', or 'mri'
         @return (numpy): Results from `process_modal_data`. See method for more info
         """
-        if modal == 'cog':
+        if modal_type == 'cog':
             cols = ['RID', 'ADNI_MEM','ADNI_EF']
-        elif modal == 'csf':
+        elif modal_type == 'csf':
             cols = ['RID', 'LOGABETA','LOGTAU','LOGPTAU','LOGPTAU/ABETA','LOGTAU/ABETA']
-        elif modal == 'mri':
+        elif modal_type == 'mri':
             cols = ['RID', 'BL_ICV', 'BL_HippVol', 'BL_Thick_EntCtx']
-        elif modal == 'demo':
-            self.clin_df.PTGENDER = pd.Categorical(self.clin_df.PTGENDER)
-            self.clin_df.PTGENDER = self.clin_df.PTGENDER.cat.codes
-            X = np.array(self.clin_df[['PTGENDER', 'PTEDUCAT', 'AGE']].values.tolist())
-            return X
+        elif modal_type == 'demo':
+            cols = ['RID', 'PTGENDER', 'PTEDUCAT', 'AGE']
 
         if cols is not None:
-            return self.process_modal_data(cols)
-    
-
-    # def get_all_data(self):
-    #     cols = [
-    #         'RID', 
-    #         'ADNI_MEM','ADNI_EF', 
-    #         'LOGABETA','LOGTAU','LOGPTAU','LOGPTAU/ABETA','LOGTAU/ABETA', 
-    #         'BL_ICV', 'BL_HippVol', 'BL_Thick_EntCtx', 
-    #         'PTGENDER', 'PTEDUCAT', 'AGE'
-    #     ]
+            return self.process_modal_data(modal_type, cols)
 
 
 
-
-
-    def process_modal_data(self, modal_cols):
+    def process_modal_data(self, modal_type, modal_cols):
         """
         Processes modal-specific data so that each RID has the same number of time points.
         @param modal_cols (list): modal-specific column names in ADNI data
@@ -117,23 +103,27 @@ class DataManager(object):
         @return y (numpy): labels in numpy array format
         """
         modal_df = self.df[modal_cols]
-        max_num_timepoints = 10  # keep number of time points same across all RIDs
+        max_num_timepoints = 5 if modal_type == 'cog' or modal_type == 'csf' else 1
         X = []
 
-        for RID in modal_df['RID'].unique():
-            RID_df = modal_df[modal_df['RID'] == RID]
-
-            RID_data = []
-            for i in range(max_num_timepoints):
-                if i < len(RID_df):
-                    curr = np.array(RID_df.iloc[i,:][modal_cols[1:]].tolist())
-                    curr[np.isnan(curr)] = 0
-                    # try prefixing with zeros instead of after keras - s
-                else: 
-                    curr = [.0 for j in range(len(modal_cols)-1)]
-                RID_data.append(curr)
+        for RID in self.RIDs:  #modal_df['RID'].unique():
+            RID_df = modal_df[modal_df['RID'] == RID].fillna(0)
+            
+            if modal_type == 'cog' or modal_type == 'csf':
+                sequences = np.array(RID_df[modal_cols[1:]].transpose().values)
+                RID_data = pad_sequences(
+                    sequences, 
+                    maxlen=max_num_timepoints,
+                    dtype='float',
+                    padding='post',
+                    truncating='post', 
+                    value=0.0
+                )
+                RID_data = RID_data.transpose())
+            else:
+                RID_data = np.array(RID_df.iloc[0,:][modal_cols[1:]].tolist())
+            
             X.append(RID_data)
-            # y.append(self.labels[self.labels['RID'] == RID].iloc[0]['Y'])
         
         X = np.array(X)
         return X
